@@ -20,17 +20,17 @@ newtype NonEmptySet t = NonEmptySet (t, Set t)
 instance Show t => Show (NonEmptySet t) where
     show = show . toList
 
--- | Construct a 'NonEmptySet' by giving one element.
+-- | O(1). Construct a 'NonEmptySet' by giving one element.
 singleton :: t -> NonEmptySet t
 singleton t = NonEmptySet (t, S.empty)
 
--- | Extend a 'NonEmptySet' by adding one element.
+-- | O(log n). Extend a 'NonEmptySet' by adding one element.
 insert :: Ord t => t -> NonEmptySet t -> NonEmptySet t
 insert t (NonEmptySet (t', set)) = case t `compare` t' of
     LT -> NonEmptySet (t, S.insert t' set)
     _ -> NonEmptySet (t', S.insert t set)
 
--- | Remove an element from a 'NonEmptySet'. If it's the only element of the
+-- | O(log n). Remove an element from a 'NonEmptySet'. If it's the only element of the
 --   set, 'Nothing' is given.
 delete :: Ord t => t -> NonEmptySet t -> Maybe (NonEmptySet t)
 delete t (NonEmptySet (t', set)) = case (t == t', S.minView set) of
@@ -38,10 +38,13 @@ delete t (NonEmptySet (t', set)) = case (t == t', S.minView set) of
     (True, Nothing) -> Nothing
     (True, Just (t'', set')) -> Just (NonEmptySet (t'', set'))
 
+-- | O(t * log n). Remove the element given in an input list from a 'NonEmptySet'.
+-- If the removal process removes all the elements of the set, 'Nothing'
+-- is given.
 deleteMany :: Ord t => [t] -> NonEmptySet t -> Maybe (NonEmptySet t)
 deleteMany ts neset = foldrM delete neset ts
 
--- | Forget the fact that a 'NonEmptySet' and construct a 'NonEmpty' list, in
+-- | O(n). Forget the fact that a 'NonEmptySet' and construct a 'NonEmpty' list, in
 --   which duplicates *are* allowed.
 toList :: NonEmptySet t -> NonEmpty t
 toList (NonEmptySet (t, set)) = t :| S.toList set
