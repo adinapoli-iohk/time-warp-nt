@@ -67,6 +67,8 @@ import           Data.Typeable
 import           Data.Time.Units               (Microsecond)
 import           Formatting                    (sformat, shown, (%))
 import           GHC.Generics                  (Generic)
+import           GHC.Stack                     (HasCallStack, callStack, prettyCallStack)
+import           Mockable.Channel              (ChannelT)
 import qualified Mockable.Channel              as Channel
 import           Mockable.Class
 import           Mockable.Concurrent
@@ -815,6 +817,13 @@ nodeDispatcher node handlerInOut =
 
     endpoint = nodeEndPoint node
 
+    writeBS :: HasCallStack
+            => ChannelT m (Maybe BS.ByteString) -> BS.ByteString -> m ()
+    writeBS ch bs
+      | BS.null bs = let _err = userError $ "nodeDispatcher: attempt to write empty BS. Callstack: " ++ prettyCallStack callStack
+                     in return () -- ignoring, for now
+      | otherwise  = Channel.writeChannel ch (Just bs)
+
     loop :: DispatcherState peerData m -> m ()
     loop !state = do
       receiveDelay
@@ -841,7 +850,7 @@ nodeDispatcher node handlerInOut =
               logError $ sformat shown err
               loop state
 
-          -- End point failure is unrecoverable.
+          -- End point failure wis unrecoverable.
           NT.ErrorEvent (NT.TransportError (NT.EventErrorCode NT.EventEndPointFailed) reason) ->
               throw (InternalError $ "EndPoint failed: " ++ reason)
 
@@ -1082,7 +1091,7 @@ nodeDispatcher node handlerInOut =
                           -- Establish the other direction in a separate thread.
                           (_, incrBytes) <- spawnHandler nstate provenance handler
                           let bs = LBS.toStrict ws'
-                          Channel.writeChannel channel (Just bs)
+                          writeBS channel bs
                           incrBytes $ fromIntegral (BS.length bs)
                           return $ state {
                                 dsConnections = Map.insert connid (peer, FeedingApplicationHandler (ChannelIn channel) incrBytes) (dsConnections state)
@@ -1133,7 +1142,7 @@ nodeDispatcher node handlerInOut =
                               Just (Just (ChannelIn channel, incrBytes, peerDataVar)) -> do
                                   putSharedExclusive peerDataVar peerData
                                   let bs = LBS.toStrict ws'
-                                  Channel.writeChannel channel (Just bs)
+                                  writeBS channel bs
                                   incrBytes $ fromIntegral (BS.length bs)
                                   return $ state {
                                         dsConnections = Map.insert connid (peer, FeedingApplicationHandler (ChannelIn channel) incrBytes) (dsConnections state)
@@ -1153,7 +1162,7 @@ nodeDispatcher node handlerInOut =
         -- mutable cell to FeedingApplicationHandler?
         Just (_peer, FeedingApplicationHandler (ChannelIn channel) incrBytes) -> do
             let bs = LBS.toStrict (LBS.fromChunks chunks)
-            Channel.writeChannel channel (Just bs)
+            writeBS channel bs
             incrBytes $ BS.length bs
             return state
 
