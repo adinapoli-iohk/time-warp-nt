@@ -105,7 +105,10 @@ instance Exception LimitExceeded
 --
 -- This carries the fields of the 'Fail' constructor of 'Decoder'
 data NoParse = NoParse !BS.ByteString !ByteOffset !T.Text
-  deriving (Show, Typeable)
+  deriving (Typeable)
+
+instance Show NoParse where
+  show = displayException
 
 instance Exception NoParse where
   displayException (NoParse trailing offset err) =
